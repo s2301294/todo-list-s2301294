@@ -1,32 +1,19 @@
-import { Theme, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { useColorScheme } from 'nativewind'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useEffect } from 'react'
 
-import { COLORS } from './colors';
+export const usePersistentTheme = () => {
+  const { colorScheme, setColorScheme, toggleColorScheme } = useColorScheme()
 
-const NAV_THEME: { light: Theme; dark: Theme } = {
-  light: {
-    dark: false,
-    colors: {
-      background: COLORS.light.background,
-      border: COLORS.light.grey5,
-      card: COLORS.light.card,
-      notification: COLORS.light.destructive,
-      primary: COLORS.light.primary,
-      text: COLORS.black,
-    },
-    fonts: DefaultTheme.fonts,
-  },
-  dark: {
-    dark: true,
-    colors: {
-      background: COLORS.dark.background,
-      border: COLORS.dark.grey5,
-      card: COLORS.dark.grey6,
-      notification: COLORS.dark.destructive,
-      primary: COLORS.dark.primary,
-      text: COLORS.white,
-    },
-    fonts: DarkTheme.fonts,
-  },
-};
+  useEffect(() => {
+    AsyncStorage.getItem('theme').then((t) => {
+      if (t === 'dark' || t === 'light') setColorScheme(t)
+    })
+  }, [])
 
-export { NAV_THEME };
+  useEffect(() => {
+    if (colorScheme) AsyncStorage.setItem('theme', colorScheme)
+  }, [colorScheme])
+
+  return { colorScheme, setColorScheme, toggleColorScheme }
+}

@@ -1,445 +1,192 @@
-import { useHeaderHeight } from '@react-navigation/elements';
-import { FlashList } from '@shopify/flash-list';
-import { cssInterop } from 'nativewind';
-import * as React from 'react';
-import {
-  Alert,
-  Button as RNButton,
-  ButtonProps,
-  Linking,
-  Share,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SearchBarProps } from 'react-native-screens';
+import React, { useState, useEffect } from "react";
+import { View, Text, ScrollView, StyleSheet, Modal, TextInput, TouchableOpacity } from "react-native";
+import TaskItem from "../components/TaskItem";
+import ThemeToggle from "../components/ThemeToggle";
+import { Ionicons } from "@expo/vector-icons";
+import { useTaskStore } from "../store/tasks";
 
-import { useActionSheet } from '@expo/react-native-action-sheet';
+export default function Index() {
+  const { tasks, addTask, toggleTask, deleteTask, editTask, theme, toggleTheme } = useTaskStore();
+  const [filter, setFilter] = useState("All");
+  const [filtered, setFiltered] = useState(tasks);
 
-import { useNavigation } from '@react-navigation/native';
+  const [modalVisible, setModalVisible] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-import * as Haptics from 'expo-haptics';
+  useEffect(() => {
+    if (filter === "All") setFiltered(tasks);
+    else if (filter === "Completed") setFiltered(tasks.filter(t => t.completed));
+    else setFiltered(tasks.filter(t => !t.completed));
+  }, [filter, tasks]);
 
-import { ActivityIndicator } from '@/components/nativewindui/ActivityIndicator';
+  const bg = theme === "dark" ? "#121212" : "#f2f2f7";
+  const text = theme === "dark" ? "#fff" : "#1c1c1e";
+  const card = theme === "dark" ? "#1e1e1e" : "#fff";
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/nativewindui/Avatar';
-
-import { Button } from '@/components/nativewindui/Button';
-
-import { DatePicker } from '@/components/nativewindui/DatePicker';
-
-import { Icon } from '@/components/nativewindui/Icon';
-
-import { Picker, PickerItem } from '@/components/nativewindui/Picker';
-
-import { ProgressIndicator } from '@/components/nativewindui/ProgressIndicator';
-
-import { Slider } from '@/components/nativewindui/Slider';
-
-import { Text } from '@/components/nativewindui/Text';
-
-import { Toggle } from '@/components/nativewindui/Toggle';
-
-import { useColorScheme } from '@/lib/useColorScheme';
-import { COLORS } from '@/theme/colors';
-
-cssInterop(FlashList, {
-  className: 'style',
-  contentContainerClassName: 'contentContainerStyle',
-});
-
-export default function Screen() {
-  const searchValue = useHeaderSearchBar({ hideWhenScrolling: COMPONENTS.length === 0 });
-
-  const data = searchValue
-    ? COMPONENTS.filter((c) => c.name.toLowerCase().includes(searchValue.toLowerCase()))
-    : COMPONENTS;
+  const handleAddOrEdit = () => {
+    if (!newTitle.trim()) return;
+    if (editingId) {
+      editTask(editingId, newTitle.trim(), newDesc.trim());
+      setEditingId(null);
+    } else {
+      addTask(newTitle.trim(), newDesc.trim());
+    }
+    setNewTitle("");
+    setNewDesc("");
+    setModalVisible(false);
+  };
 
   return (
-    <FlashList
-      contentInsetAdjustmentBehavior="automatic"
-      keyboardShouldPersistTaps="handled"
-      data={data}
-      contentContainerClassName="py-4 android:pb-12"
-      extraData={searchValue}
-      removeClippedSubviews={false} // used for slecting text on android
-      keyExtractor={keyExtractor}
-      ItemSeparatorComponent={renderItemSeparator}
-      renderItem={renderItem}
-      ListEmptyComponent={COMPONENTS.length === 0 ? ListEmptyComponent : undefined}
-    />
-  );
-}
-
-function useHeaderSearchBar(props: SearchBarProps = {}) {
-  const { colorScheme, colors } = useColorScheme();
-  const navigation = useNavigation();
-  const [search, setSearch] = React.useState('');
-
-  React.useLayoutEffect(() => {
-    navigation.setOptions({
-      headerSearchBarOptions: {
-        placeholder: 'Search...',
-        textColor: colors.foreground,
-        tintColor: colors.primary,
-        headerIconColor: colors.foreground,
-        hintTextColor: colors.grey,
-        hideWhenScrolling: false,
-        onChangeText(ev) {
-          setSearch(ev.nativeEvent.text);
-        },
-        ...props,
-      } satisfies SearchBarProps,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigation, colorScheme]);
-
-  return search;
-}
-
-function ListEmptyComponent() {
-  const insets = useSafeAreaInsets();
-  const dimensions = useWindowDimensions();
-  const headerHeight = useHeaderHeight();
-  const { colors } = useColorScheme();
-  const height = dimensions.height - headerHeight - insets.bottom - insets.top;
-
-  return (
-    <View style={{ height }} className="flex-1 items-center justify-center gap-1 px-12">
-      <Icon name="doc.badge.plus" size={42} color={colors.grey} />
-      <Text variant="title3" className="pb-1 text-center font-semibold">
-        No Components Installed
-      </Text>
-      <Text color="tertiary" variant="subhead" className="pb-4 text-center">
-        You can install any of the free components from the{' '}
-        <Text
-          onPress={() => Linking.openURL('https://nativewindui.com')}
-          variant="subhead"
-          className="text-primary">
-          NativewindUI
-        </Text>
-        {' website.'}
-      </Text>
-    </View>
-  );
-}
-
-type ComponentItem = { name: string; component: React.FC };
-
-function keyExtractor(item: ComponentItem) {
-  return item.name;
-}
-
-function renderItemSeparator() {
-  return <View className="p-2" />;
-}
-
-function renderItem({ item }: { item: ComponentItem }) {
-  return (
-    <Card title={item.name}>
-      <item.component />
-    </Card>
-  );
-}
-
-function Card({ children, title }: { children: React.ReactNode; title: string }) {
-  return (
-    <View className="px-4">
-      <View className="gap-4 rounded-xl border border-border bg-card p-4 pb-6 shadow-sm shadow-black/10 dark:shadow-none">
-        <Text className="text-center text-sm font-medium tracking-wider opacity-60">{title}</Text>
-        {children}
+    <View style={[styles.container, { backgroundColor: bg }]}>
+      <View style={styles.topRow}>
+        <ThemeToggle colorScheme={theme} toggleColorScheme={toggleTheme} />
+        <Text style={[styles.header, { color: text }]}>Todo List</Text>
+        <TouchableOpacity onPress={() => {
+          setModalVisible(true);
+          setEditingId(null);
+          setNewTitle("");
+          setNewDesc("");
+        }}>
+          <Ionicons name="add-circle-outline" size={36} color="#0a84ff" />
+        </TouchableOpacity>
       </View>
+
+      <ScrollView style={{ flex: 1, width: "100%" }} contentContainerStyle={{ paddingBottom: 100 }}>
+        {filtered.length === 0 ? (
+          <View style={{ marginTop: 50, alignItems: "center" }}>
+            <Text style={{ color: text, textAlign: "center", fontSize: 16, marginBottom: 5 }}>
+              No tasks found
+            </Text>
+            <Text style={{ color: text, textAlign: "center", fontSize: 14, opacity: 0.7 }}>
+              Tap + to add a task. Swipe right to edit, left to delete, tap task to toggle.
+            </Text>
+          </View>
+        ) : (
+          filtered.map(task => (
+            <TaskItem
+              key={task.id}
+              task={task}
+              onToggle={toggleTask}
+              onDelete={deleteTask}
+              onStartEdit={(id) => {
+                const t = tasks.find(t => t.id === id);
+                if (!t) return;
+                setNewTitle(t.title);
+                setNewDesc(t.description || "");
+                setEditingId(id);
+                setModalVisible(true);
+              }}
+              cardColor={card}
+              textColor={text}
+            />
+          ))
+        )}
+      </ScrollView>
+
+      {/* Floating bottom filter pills */}
+      <View style={styles.filterContainer}>
+        {["All", "Completed", "Pending"].map(f => {
+          const isSelected = filter === f;
+          return (
+            <TouchableOpacity
+              key={f}
+              onPress={() => setFilter(f)}
+              style={[
+                styles.filterButton,
+                {
+                  backgroundColor: isSelected
+                    ? "#0a84ff"
+                    : theme === "dark"
+                      ? "#1e1e1e"
+                      : "#fff",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: isSelected ? 0.25 : 0,
+                  shadowRadius: 3,
+                  elevation: isSelected ? 3 : 0,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  {
+                    color: isSelected
+                      ? "#fff"
+                      : theme === "dark"
+                        ? "#fff"
+                        : "#1c1c1e",
+                  },
+                ]}
+              >
+                {f}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <Modal
+        animationType="slide"
+        transparent
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalBg}>
+          <View style={[styles.modalContainer, { backgroundColor: card }]}>
+            <TextInput
+              style={[styles.modalInput, { color: text, borderColor: "#ccc" }]}
+              placeholder="Task Title"
+              placeholderTextColor="#888"
+              value={newTitle}
+              onChangeText={setNewTitle}
+            />
+            <TextInput
+              style={[styles.modalInput, { color: text, borderColor: "#ccc", height: 80 }]}
+              placeholder="Description (optional)"
+              placeholderTextColor="#888"
+              value={newDesc}
+              onChangeText={setNewDesc}
+              multiline
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity onPress={handleAddOrEdit} style={styles.addBtn}>
+                <Text style={{ color: "#fff", fontWeight: "600" }}>{editingId ? "Save" : "Add Task"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.cancelBtn}>
+                <Text style={{ color: text, fontWeight: "600" }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-const COMPONENTS: ComponentItem[] = [
-  {
-    name: 'Avatar',
-    component: function AvatarExample() {
-      const TWITTER_AVATAR_URI =
-        'https://pbs.twimg.com/profile_images/1782428433898708992/1voyv4_A_400x400.jpg';
-      return (
-        <View className="items-center">
-          <Avatar alt="NativewindUI Avatar">
-            <AvatarImage source={{ uri: TWITTER_AVATAR_URI }} />
-            <AvatarFallback>
-              <Text>NWUI</Text>
-            </AvatarFallback>
-          </Avatar>
-        </View>
-      );
-    },
+const styles = StyleSheet.create({
+  container: { flex: 1, paddingTop: 60, paddingHorizontal: 20 },
+  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  header: { fontSize: 28, fontWeight: "700", textAlign: "center" },
+  filterContainer: {
+    position: "absolute",
+    bottom: 30,
+    flexDirection: "row",
+    alignSelf: "center",
   },
-
-  // {
-  //   name: 'Button',
-  //   component: function ButtonExample() {
-  //     function onPress() {
-  //       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  //     }
-  //     return (
-  //       <View className="items-center justify-center gap-4 p-4">
-  //         <Button onPress={onPress}>
-  //           <Icon name="play.fill" className="ios:size-4 text-white" />
-  //           <Text>Primary</Text>
-  //         </Button>
-  //         <Button onPress={onPress} variant="secondary">
-  //           <Text>Secondary</Text>
-  //         </Button>
-  //         <Button onPress={onPress} variant="tonal">
-  //           <Text>Tonal</Text>
-  //         </Button>
-  //         <Button onPress={onPress} variant="plain">
-  //           <Text>Plain</Text>
-  //         </Button>
-  //         <Button onPress={onPress} variant="tonal" size="icon">
-  //           <Icon name="heart.fill" className="ios:text-primary size-5 text-foreground" />
-  //         </Button>
-  //       </View>
-  //     );
-  //   },
-  // },
-
-  {
-    name: 'Slider',
-    component: function SliderExample() {
-      const [sliderValue, setSliderValue] = React.useState(0.5);
-      return (
-        <Slider
-          value={sliderValue}
-          onValueChange={setSliderValue}
-          minimumValue={0}
-          maximumValue={1}
-        />
-      );
-    },
+  filterButton: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 25,
+    marginHorizontal: 6,
   },
-
-  {
-    name: 'Activity Indicator',
-    component: function ActivityIndicatorExample() {
-      return (
-        <View className="items-center p-4">
-          <ActivityIndicator />
-        </View>
-      );
-    },
-  },
-
-  {
-    name: 'Action Sheet',
-    component: function ActionSheetExample() {
-      const { colorScheme, colors } = useColorScheme();
-      const { showActionSheetWithOptions } = useActionSheet();
-
-      return (
-        <View className="items-center">
-          <Button
-            variant="secondary"
-            onPress={async () => {
-              const options = ['Delete', 'Save', 'Cancel'];
-              const destructiveButtonIndex = 0;
-              const cancelButtonIndex = 2;
-
-              showActionSheetWithOptions(
-                {
-                  options,
-                  cancelButtonIndex,
-                  destructiveButtonIndex,
-                  containerStyle: {
-                    backgroundColor: colorScheme === 'dark' ? 'black' : 'white',
-                  },
-                  textStyle: {
-                    color: colors.foreground,
-                  },
-                },
-                (selectedIndex) => {
-                  switch (selectedIndex) {
-                    case 1:
-                      // Save
-                      break;
-
-                    case destructiveButtonIndex:
-                      // Delete
-                      break;
-
-                    case cancelButtonIndex:
-                    // Canceled
-                  }
-                }
-              );
-            }}>
-            <Text>Open action sheet</Text>
-          </Button>
-        </View>
-      );
-    },
-  },
-
-  {
-    name: 'Progress Indicator',
-    component: function ProgressIndicatorExample() {
-      const [progress, setProgress] = React.useState(13);
-
-      React.useEffect(() => {
-        let id: ReturnType<typeof setInterval> | null = null;
-        if (!id) {
-          id = setInterval(() => {
-            setProgress((prev) => (prev >= 99 ? 0 : prev + 5));
-          }, 1000);
-        }
-        return () => {
-          if (id) clearInterval(id);
-        };
-      }, []);
-      return (
-        <View className="p-4">
-          <ProgressIndicator value={progress} />
-        </View>
-      );
-    },
-  },
-
-  {
-    name: 'Activity View',
-    component: function ActivityViewExample() {
-      return (
-        <View className="items-center">
-          <Button
-            variant="tonal"
-            onPress={async () => {
-              try {
-                const result = await Share.share({
-                  message: 'NativewindUI | Native feeling UI with TailwindCSS.',
-                });
-                if (result.action === Share.sharedAction) {
-                  if (result.activityType) {
-                    // shared with activity type of result.activityType
-                  } else {
-                    // shared
-                  }
-                } else if (result.action === Share.dismissedAction) {
-                  // dismissed
-                }
-              } catch (error: any) {
-                Alert.alert(error.message);
-              }
-            }}>
-            <Text>Share a message</Text>
-          </Button>
-        </View>
-      );
-    },
-  },
-
-  {
-    name: 'Date Picker',
-    component: function DatePickerExample() {
-      const [date, setDate] = React.useState(new Date());
-      return (
-        <View className="items-center">
-          <DatePicker
-            value={date}
-            mode="datetime"
-            onChange={(ev) => {
-              setDate(new Date(ev.nativeEvent.timestamp));
-            }}
-          />
-        </View>
-      );
-    },
-  },
-
-  {
-    name: 'Picker',
-    component: function PickerExample() {
-      const { colors } = useColorScheme();
-      const [picker, setPicker] = React.useState('blue');
-
-      return (
-        <Picker selectedValue={picker} onValueChange={(itemValue) => setPicker(itemValue)}>
-          <PickerItem
-            label="Red"
-            value="red"
-            color={colors.foreground}
-            style={{
-              backgroundColor: colors.root,
-            }}
-          />
-          <PickerItem
-            label="Blue"
-            value="blue"
-            color={colors.foreground}
-            style={{
-              backgroundColor: colors.root,
-            }}
-          />
-          <PickerItem
-            label="Green"
-            value="green"
-            color={colors.foreground}
-            style={{
-              backgroundColor: colors.root,
-            }}
-          />
-        </Picker>
-      );
-    },
-  },
-
-  //   {
-  //    name: 'Text',
-  //     component: function TextExample() {
-  //       return (
-  //        <View className="gap-2">
-  //          <Text variant="largeTitle" className="text-center">
-  //            Large Title
-  //          </Text>
-  //          <Text variant="title1" className="text-center">
-  //            Title 1
-  //          </Text>
-  //          <Text variant="title2" className="text-center">
-  //            Title 2
-  //          </Text>
-  //          <Text variant="title3" className="text-center">
-  //            Title 3
-  //          </Text>
-  //          <Text variant="heading" className="text-center">
-  //            Heading
-  //          </Text>
-  //          <Text variant="body" className="text-center">
-  //            Body
-  //          </Text>
-  //          <Text variant="callout" className="text-center">
-  //            Callout
-  //          </Text>
-  //          <Text variant="subhead" className="text-center">
-  //            Subhead
-  //          </Text>
-  //          <Text variant="footnote" className="text-center">
-  //            Footnote
-  //          </Text>
-  //          <Text variant="caption1" className="text-center">
-  //            Caption 1
-  //          </Text>
-  //          <Text variant="caption2" className="text-center">
-  //            Caption 2
-  //          </Text>
-  //         </View>
-  //       );
-  //     },
-  //   },
-
-  {
-    name: 'Toggle',
-    component: function ToggleExample() {
-      const [switchValue, setSwitchValue] = React.useState(true);
-      return (
-        <View className="items-center">
-          <Toggle value={switchValue} onValueChange={setSwitchValue} className="mx-auto" />
-        </View>
-      );
-    },
-  },
-];
+  filterText: { fontWeight: "600", fontSize: 16 },
+  modalBg: { flex: 1, backgroundColor: "#00000066", justifyContent: "center", alignItems: "center" },
+  modalContainer: { width: "90%", borderRadius: 16, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 },
+  modalInput: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 15, fontSize: 16 },
+  modalButtons: { flexDirection: "row", justifyContent: "space-between" },
+  addBtn: { backgroundColor: "#0a84ff", padding: 12, borderRadius: 12, flex: 1, marginRight: 8, alignItems: "center" },
+  cancelBtn: { borderWidth: 1, padding: 12, borderRadius: 12, flex: 1, marginLeft: 8, alignItems: "center" },
+});
